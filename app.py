@@ -30,7 +30,7 @@ if not api_key:
     st.stop()
 
 genai.configure(api_key=api_key)
-model = genai.GenerativeModel('gemini-2.5-pro')# Bypassing strict medical safety filters for clinical simulation
+model = genai.GenerativeModel('gemini-3.1-pro-preview')# Bypassing strict medical safety filters for clinical simulation
 safety = [
     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
     {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
