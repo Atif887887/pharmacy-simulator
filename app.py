@@ -2,10 +2,8 @@ import streamlit as st
 import google.generativeai as genai
 import json
 
-# Page Configuration for Mobile Responsiveness
 st.set_page_config(page_title="Virtual Pharmacy Clinic", page_icon="💊", layout="centered")
 
-# Initialize Session States
 if 'score' not in st.session_state:
     st.session_state.score = 500
 if 'treated' not in st.session_state:
@@ -15,10 +13,9 @@ if 'patient' not in st.session_state:
 if 'selected_drug' not in st.session_state:
     st.session_state.selected_drug = "None selected"
 
-# Sidebar Setup & Gamification
 with st.sidebar:
     st.header("⚙️ Clinic Settings")
-    api_key = st.text_input("Gemini API Key", type="password", placeholder="AIzaSy...")
+    api_key = st.text_input("Gemini API Key", type="password", placeholder="Paste key here...")
     st.markdown("---")
     st.header("🏆 Career Stats")
     st.metric(label="In-Game Funds", value=f"${st.session_state.score}")
@@ -35,32 +32,46 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
+# Bypassing strict medical safety filters for clinical simulation
+safety = [
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"}
+]
+
 def generate_patient():
     prompt = f"""
     Act as a clinical pharmacy professor. Create a complex patient case for the category: {category}. 
     Align with the Pharm-D Pakistan 2010 syllabus. Output ONLY valid JSON with this exact structure:
     {{
       "name": "string",
-      "age": number,
+      "age": 34,
       "bp": "string",
       "pulse": "string",
       "temp": "string",
       "allergies": "string",
       "symptoms": "string",
       "labs": "string",
-      "diagnosisApproach": "Detailed paragraph explaining how the doctor diagnosed this condition based on clinical findings.",
+      "diagnosisApproach": "string",
       "shelfDrugs": ["Drug 1", "Drug 2", "Drug 3", "Drug 4"],
       "correctDrug": "string",
       "correctDose": "string"
     }}
     """
     try:
-        response = model.generate_content(prompt)
-        clean_text = response.text.strip().replace('```json', '').replace('```', '')
+        response = model.generate_content(prompt, safety_settings=safety)
+        
+        # Bulletproof JSON extraction
+        text = response.text
+        start = text.find('{')
+        end = text.rfind('}') + 1
+        clean_text = text[start:end]
+        
         st.session_state.patient = json.loads(clean_text)
         st.session_state.selected_drug = "None selected"
     except Exception as e:
-        st.error("Error connecting to Gemini. Please try clicking again.")
+        st.error(f"System Error: {str(e)}")
 
 if st.button("Call Next Patient", use_container_width=True):
     generate_patient()
@@ -70,32 +81,34 @@ if st.session_state.patient:
     
     st.markdown("### 👤 Patient Profile")
     with st.container():
-        st.markdown(f"**Name:** {p['name']} | **Age:** {p['age']}")
-        if p['allergies'].lower() != "none":
-            st.error(f"⚠️ **ALLERGY ALERT:** {p['allergies']}")
+        st.markdown(f"**Name:** {p.get('name', 'N/A')} | **Age:** {p.get('age', 'N/A')}")
+        if str(p.get('allergies', 'none')).lower() != "none":
+            st.error(f"⚠️ **ALLERGY ALERT:** {p.get('allergies', 'None')}")
         else:
             st.success("✅ **Allergies:** None reported")
             
         c1, c2, c3 = st.columns(3)
-        c1.metric("BP", p['bp'])
-        c2.metric("Pulse", p['pulse'])
-        c3.metric("Temp", p['temp'])
+        c1.metric("BP", p.get('bp', '--'))
+        c2.metric("Pulse", p.get('pulse', '--'))
+        c3.metric("Temp", p.get('temp', '--'))
         
-        st.write(f"**Symptoms:** {p['symptoms']}")
-        st.write(f"**Lab Tests:** {p['labs']}")
+        st.write(f"**Symptoms:** {p.get('symptoms', '--')}")
+        st.write(f"**Lab Tests:** {p.get('labs', '--')}")
         
         with st.expander("🩺 View Doctor's Diagnostic Reasoning", expanded=True):
-            st.info(p['diagnosisApproach'])
+            st.info(p.get('diagnosisApproach', '--'))
 
     st.markdown("---")
     st.markdown("### 🛒 Dispensing Counter")
     st.write("**Medication Shelf (Tap to Select):**")
     
-    cols = st.columns(len(p['shelfDrugs']))
-    for idx, drug in enumerate(p['shelfDrugs']):
-        with cols[idx]:
-            if st.button(drug, key=f"drug_{idx}", use_container_width=True):
-                st.session_state.selected_drug = drug
+    shelf = p.get('shelfDrugs', [])
+    if shelf:
+        cols = st.columns(len(shelf))
+        for idx, drug in enumerate(shelf):
+            with cols[idx]:
+                if st.button(drug, key=f"drug_{idx}", use_container_width=True):
+                    st.session_state.selected_drug = drug
 
     st.markdown(f"**Selected Drug on Counter:** `💊 {st.session_state.selected_drug}`")
     
@@ -121,22 +134,25 @@ if st.session_state.patient:
                 }}
                 """
                 try:
-                    eval_res = model.generate_content(grading_prompt)
-                    clean_eval = eval_res.text.strip().replace('```json', '').replace('```', '')
+                    eval_res = model.generate_content(grading_prompt, safety_settings=safety)
+                    
+                    text = eval_res.text
+                    start = text.find('{')
+                    end = text.rfind('}') + 1
+                    clean_eval = text[start:end]
                     grading = json.loads(clean_eval)
                     
-                    st.session_state.score += grading['points']
+                    st.session_state.score += grading.get('points', 0)
                     
-                    if grading['fatalError']:
-                        st.error(f"🚨 **FATAL ERROR:** {grading['feedback']}")
-                    elif grading['isCorrect']:
+                    if grading.get('fatalError', False):
+                        st.error(f"🚨 **FATAL ERROR:** {grading.get('feedback', '')}")
+                    elif grading.get('isCorrect', False):
                         st.session_state.treated += 1
-                        st.success(f"✅ **SUCCESS:** {grading['feedback']}")
+                        st.success(f"✅ **SUCCESS:** {grading.get('feedback', '')}")
                     else:
-                        st.warning(f"⚠️ **INCORRECT:** {grading['feedback']}")
+                        st.warning(f"⚠️ **INCORRECT:** {grading.get('feedback', '')}")
                         
-                    st.rerun()
                 except Exception as e:
-                    st.error("Grading evaluation error. Try submitting again.")
+                    st.error(f"Grading Error: {str(e)}")
 else:
     st.info("👆 Click **'Call Next Patient'** above to open your first case file.")
