@@ -3,6 +3,53 @@ import google.generativeai as genai
 import json
 
 st.set_page_config(page_title="Virtual Pharmacy Clinic", page_icon="💊", layout="centered")
+# --- CUSTOM CSS STYLING ---
+st.markdown("""
+<style>
+/* Main Background and Text */
+.stApp {
+    background-color: #0f171e;
+    color: #e2e8f0;
+    font-family: 'Inter', sans-serif;
+}
+
+/* Neon Glowing Buttons */
+div.stButton > button:first-child {
+    background-color: #1a2530;
+    color: #38bdf8;
+    border: 1px solid #38bdf8;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+    transition: all 0.3s ease;
+    font-weight: 600;
+}
+div.stButton > button:first-child:hover {
+    background-color: #38bdf8;
+    color: #0f171e;
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.6);
+}
+
+/* Warning/Error Alerts (Allergies) */
+.stAlert {
+    background-color: rgba(220, 38, 38, 0.1);
+    border-left: 4px solid #ef4444;
+}
+
+/* Text Input Boxes */
+.stTextInput > div > div > input {
+    background-color: #1e293b;
+    color: white;
+    border: 1px solid #475569;
+    border-radius: 6px;
+}
+
+/* Metric Colors (Money & Stats) */
+div[data-testid="stMetricValue"] {
+    color: #10b981; 
+}
+</style>
+""", unsafe_allow_html=True)
+# --------------------------
 
 if 'score' not in st.session_state:
     st.session_state.score = 500
