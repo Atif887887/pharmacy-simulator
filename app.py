@@ -134,7 +134,7 @@ if st.session_state.patient:
             
         with col2:
             st.markdown("**Visual Clinical Aid**")
-            st.image("https://placehold.co/400x400/1e293b/38bdf8?text=Clinical+Scan", use_column_width=True)
+            st.image("https://placehold.co/400x400/1e293b/38bdf8?text=Clinical+Scan", width="stretch")
             st.caption("Reference image")
         # --------------------------------------
 
