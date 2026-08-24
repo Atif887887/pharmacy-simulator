@@ -30,7 +30,19 @@ if not api_key:
     st.stop()
 
 genai.configure(api_key=api_key)
-model = genai.GenerativeModel('gemini-3.1-pro-preview')# Bypassing strict medical safety filters for clinical simulation
+
+# Auto-detect the best free-tier model available to your specific API key
+valid_model = "gemini-1.5-flash" # Fallback
+try:
+    for m in genai.list_models():
+        if 'generateContent' in m.supported_generation_methods:
+            if "flash" in m.name:
+                valid_model = m.name
+                break
+except Exception as e:
+    st.error(f"API Authentication Error: Make sure your API key is correct.")
+
+model = genai.GenerativeModel(valid_model) # Bypassing strict medical safety filters for clinical simulation
 safety = [
     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
     {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
