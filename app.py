@@ -3,6 +3,7 @@ import google.generativeai as genai
 import json
 
 st.set_page_config(page_title="Virtual Pharmacy Clinic", page_icon="💊", layout="centered")
+
 # --- CUSTOM CSS STYLING ---
 st.markdown("""
 <style>
@@ -12,7 +13,6 @@ st.markdown("""
     color: #e2e8f0;
     font-family: 'Inter', sans-serif;
 }
-
 /* Neon Glowing Buttons */
 div.stButton > button:first-child {
     background-color: #1a2530;
@@ -28,13 +28,11 @@ div.stButton > button:first-child:hover {
     color: #0f171e;
     box-shadow: 0 0 15px rgba(56, 189, 248, 0.6);
 }
-
 /* Warning/Error Alerts (Allergies) */
 .stAlert {
     background-color: rgba(220, 38, 38, 0.1);
     border-left: 4px solid #ef4444;
 }
-
 /* Text Input Boxes */
 .stTextInput > div > div > input {
     background-color: #1e293b;
@@ -42,7 +40,6 @@ div.stButton > button:first-child:hover {
     border: 1px solid #475569;
     border-radius: 6px;
 }
-
 /* Metric Colors (Money & Stats) */
 div[data-testid="stMetricValue"] {
     color: #10b981; 
@@ -77,15 +74,7 @@ if not api_key:
     st.stop()
 
 genai.configure(api_key=api_key)
-
-# Auto-detect the best free-tier model available to your specific API key
-model = genai.GenerativeModel('gemini-3.6-flash') # Bypassing strict medical safety filters for clinical simulation
-safety = [
-    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"}
-]
+model = genai.GenerativeModel('gemini-3.6-flash')
 
 def generate_patient():
     prompt = f"""
@@ -107,14 +96,11 @@ def generate_patient():
     }}
     """
     try:
-        response = model.generate_content(prompt, safety_settings=safety)
-        
-        # Bulletproof JSON extraction
+        response = model.generate_content(prompt)
         text = response.text
         start = text.find('{')
         end = text.rfind('}') + 1
         clean_text = text[start:end]
-        
         st.session_state.patient = json.loads(clean_text)
         st.session_state.selected_drug = "None selected"
     except Exception as e:
@@ -128,20 +114,30 @@ if st.session_state.patient:
     
     st.markdown("### 👤 Patient Profile")
     with st.container():
-        st.markdown(f"**Name:** {p.get('name', 'N/A')} | **Age:** {p.get('age', 'N/A')}")
-        if str(p.get('allergies', 'none')).lower() != "none":
-            st.error(f"⚠️ **ALLERGY ALERT:** {p.get('allergies', 'None')}")
-        else:
-            st.success("✅ **Allergies:** None reported")
+        # --- NEW 2-COLUMN LAYOUT WITH IMAGE ---
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.markdown(f"**Name:** {p.get('name', 'N/A')} | **Age:** {p.get('age', 'N/A')}")
+            if str(p.get('allergies', 'none')).lower() != "none":
+                st.error(f"⚠️ **ALLERGY ALERT:** {p.get('allergies', 'None')}")
+            else:
+                st.success("✅ **Allergies:** None reported")
+                
+            c1, c2, c3 = st.columns(3)
+            c1.metric("BP", p.get('bp', '--'))
+            c2.metric("Pulse", p.get('pulse', '--'))
+            c3.metric("Temp", p.get('temp', '--'))
             
-        c1, c2, c3 = st.columns(3)
-        c1.metric("BP", p.get('bp', '--'))
-        c2.metric("Pulse", p.get('pulse', '--'))
-        c3.metric("Temp", p.get('temp', '--'))
-        
-        st.write(f"**Symptoms:** {p.get('symptoms', '--')}")
-        st.write(f"**Lab Tests:** {p.get('labs', '--')}")
-        
+            st.write(f"**Symptoms:** {p.get('symptoms', '--')}")
+            st.write(f"**Lab Tests:** {p.get('labs', '--')}")
+            
+        with col2:
+            st.markdown("**Visual Clinical Aid**")
+            st.image("https://placehold.co/400x400/1e293b/38bdf8?text=Clinical+Scan", use_column_width=True)
+            st.caption("Reference image")
+        # --------------------------------------
+
         with st.expander("🩺 View Doctor's Diagnostic Reasoning", expanded=True):
             st.info(p.get('diagnosisApproach', '--'))
 
@@ -181,8 +177,7 @@ if st.session_state.patient:
                 }}
                 """
                 try:
-                    eval_res = model.generate_content(grading_prompt, safety_settings=safety)
-                    
+                    eval_res = model.generate_content(grading_prompt)
                     text = eval_res.text
                     start = text.find('{')
                     end = text.rfind('}') + 1
